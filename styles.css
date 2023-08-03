@@ -1,0 +1,21 @@
+#demoCanvas {
+  border: 1px solid black;
+}
+
+.wrapper {
+  background-color: "#eee";
+  margin: 2px auto;
+  width: 80%;
+}
+.container {
+  background-color: "#eee";
+}
+.controls {
+  display: flex;
+  width: 80%;
+  justify-content: space-between;
+}
+
+.controls button {
+  padding: 5px 20px;
+}
