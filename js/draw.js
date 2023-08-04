@@ -1,20 +1,23 @@
-var stage;
+var canvas, stage;
 var loader;
+
+var mouseTarget; // the display object currently under the mouse, or being dragged
+var dragStarted; // indicates whether we are currently in a drag operation
+var offset;
+var update = true;
 
 // LOGIC HANDLERS
 
 // SETUP
 
 function init() {
-  stage = new createjs.Stage("demoCanvas");
-  // var circle = new createjs.Shape();
-  // circle.graphics.beginFill("DeepSkyBlue").drawCircle(0, 0, 50);
-  // circle.x = 100;
-  // circle.y = 100;
-  // stage.addChild(circle);
+  // create stage and point it to the canvas:
+  canvas = document.getElementById("demoCanvas");
+  stage = new createjs.Stage(canvas);
 
   loader = new createjs.LoadQueue(); // Create the LoadQueue instance once.
   let testImage = new createjs.Bitmap(base64Image); //Image taken from another js file
+
   stage.addChild(testImage);
   testImage.x = 20;
   testImage.y = 20;
@@ -25,140 +28,107 @@ function init() {
 }
 
 function setIrisLeft() {
-  const circle1 = createCircle(1);
-  const circle2 = createCircle(2);
-  const circle3 = createCircle(3);
-  // stage.addChild(circle1);
-  // stage.addChild(circle2);
-  // stage.addChild(circle3);
-  // stage.update();
+  var container = new createjs.Container();
+  stage.addChild(container);
+
+  const circle1 = createCircle(container, 1);
+  const circle2 = createCircle(container, 2);
+  const circle3 = createCircle(container, 3);
+
+  var g = new createjs.Graphics();
+  // g.arc(100, 100, 20, 0, Math.PI * 2);
+  g.arcTo(circle1.x, circle1.y, circle2.x, circle2.y, 0);
+  // stage.addChild(g);
+
+  // enable touch interactions if supported on the current device:
+  createjs.Touch.enable(stage);
+
+  // enabled mouse over / out events
+  stage.enableMouseOver(10);
+  stage.mouseMoveOutside = true; // keep tracking the mouse even when it leaves the canvas
+
+  createjs.Ticker.addEventListener("tick", tick);
 }
 
-function createCircle(option) {
+// Actions carried out each tick (aka frame)
+function tick(event) {
+  // This set makes it so the stage only re-renders when an event handler indicates a change has happened.
+  if (update) {
+    update = false; // only update once
+    stage.update(event);
+  }
+}
+
+function stop() {
+  createjs.Ticker.removeEventListener("tick", tick);
+}
+
+function createCircle(container, index) {
   const newShape = new createjs.Shape();
+  container.addChild(newShape);
   var myGraphics = newShape.graphics;
   var fillCommand = myGraphics.beginFill("DeepSkyBlue").command;
   myGraphics.drawCircle(0, 0, 10);
 
-  if (!option || option == 1) {
+  if (!index || index == 1) {
     fillCommand.style = "DeepSkyBlue";
     newShape.x = 50;
     newShape.y = 50;
-  } else if (option == 2) {
+  } else if (index == 2) {
     fillCommand.style = "red";
     newShape.x = 100;
     newShape.y = 100;
-  } else if (option == 3) {
+  } else if (index == 3) {
     fillCommand.style = "green";
     newShape.x = 150;
     newShape.y = 150;
   }
+  // newShape.regX = 50; // left offset
+  // newShape.regY = 50; // y offset
+  newShape.name = "circle_" + index;
+  newShape.cursor = "pointer";
+  const originalScale = newShape.scale;
+
+  // using "on" binds the listener to the scope of the currentTarget by default
+  // in this case that means it executes in the scope of the button.
+  newShape.on("mousedown", function (evt) {
+    const o = evt.target;
+    // Move the clicked shape to the top of its parent's display list (z-index).
+    o.parent.addChild(o);
+    // this.parent.addChild(o);
+
+    // Calculate the offset between the mouse cursor position and the newShape's position.
+    this.offset = { x: this.x - evt.stageX, y: this.y - evt.stageY };
+    // o.offset = { x: o.x - evt.stageX, y: o.y - evt.stageY };
+  });
+
+  // the pressmove event is dispatched when the mouse moves after a mousedown on the target until the mouse is released.
+  newShape.on("pressmove", function (evt) {
+    const o = evt.target;
+    o.x = evt.stageX + o.offset.x;
+    o.y = evt.stageY + o.offset.y;
+    // this.x = evt.stageX + this.offset.x;
+    // this.y = evt.stageY + this.offset.y;
+    // indicate that the stage should be updated on the next tick:
+    update = true;
+  });
+
+  // Increases size while mouse is over the Shape
+  newShape.on("rollover", function (evt) {
+    const o = evt.target;
+    o.scale = o.scale * 1.2;
+    // this.scale = this.scale * 1.2;
+    update = true;
+  });
+
+  // Returns size to normal when mouse is out of Shape
+  newShape.on("rollout", function (evt) {
+    const o = evt.target;
+    o.scale = originalScale;
+    update = true;
+  });
+
   stage.addChild(newShape);
   stage.update();
   return newShape;
-}
-
-/**********testing failed************ */
-
-const ImagePath = "assets/womaneyes.jpg";
-
-let manifest = [
-  // {
-  //   src: "https://naruhodo.repop.jp/wp-content/uploads/2018/01/kitarou.png",
-  //   id: "kitarou",
-  // },
-  // {
-  //   src: "https://naruhodo.repop.jp/wp-content/uploads/2018/01/medamaoyaji.png",
-  //   id: "medamaoyaji",
-  // },
-  // { src: "https://s3.envato.com/files/289097391/jju-32.jpg", id: "womaneyes" },
-  { src: ImagePath, id: "womaneyes" },
-];
-let images = [];
-
-function loadImage() {
-  loader.removeAllEventListeners(); // Remove any existing event listeners.
-  loader.on("progress", handleProgress);
-  loader.addEventListener("fileload", fileload);
-  loader.addEventListener("complete", handleComplete);
-  loader.on("error", handleError);
-  loader.loadManifest(manifest, true);
-  // loader.loadFile({
-  //   id: ="womaneyes"
-  //   src: ImagePath,
-  //   type: createjs.LoadQueue.IMAGE,
-  // });
-}
-
-function handleProgress(event) {
-  // Handle the loading progress here (e.g., update a progress bar).
-  console.log("Progress: " + event.progress * 100 + "%");
-}
-function fileload(event) {
-  if (event.item.type == "image") {
-    images[event.item.id] = event.result;
-  }
-}
-function handleComplete(event) {
-  // All assets are loaded successfully. You can access your loaded assets through the queue's getResult method.
-  var image = loader.getResult("womaneyes");
-  console.log("Image loaded:", image);
-}
-function handleError(event) {
-  // Handle errors if any occur during loading.
-  console.log("Error loading asset:", event);
-}
-// function complete(event) {
-//   event.target.removeEventListener("fileload", fileload);
-//   event.target.removeEventListener("complete", complete);
-//   // initExample();
-// }
-
-// function loadItem(url) {
-//   var queue = new createjs.LoadQueue(true, null, true);
-//   //Add the event listener and handler
-//   queue.on(
-//     "fileload",
-//     function (event) {
-//       var type = event.item.type;
-//       if (type == createjs.LoadQueue.IMAGE) {
-//         //make a CreateJS Bitmap object from the result
-//         var imgItem = event.result;
-//         image = new createjs.Bitmap(imgItem.src);
-//         stage.addChild(image);
-//         stage.update();
-//       }
-//     },
-//     null,
-//     true
-//     // options
-//   ); //create a LoadItem and set the crossOrigin property
-//   var loadItem = new createjs.LoadItem().set({
-//     src: url,
-//     crossOrigin: "Anonymous",
-//   }); //load it
-//   queue.loadFile(loadItem);
-// }
-
-function initExample() {
-  let stage = new createjs.Stage("main");
-  let bg = new createjs.Shape();
-  bg.graphics.beginFill("black").drawRect(0, 0, 500, 300);
-  stage.addChild(bg);
-
-  let kitarou = new createjs.Bitmap(images["kitarou"]);
-  stage.addChild(kitarou);
-  kitarou.x = 50;
-  kitarou.y = 50;
-  kitarou.scaleX = 0.2;
-  kitarou.scaleY = 0.2;
-
-  let medamaoyaji = new createjs.Bitmap(images["medamaoyaji"]);
-  stage.addChild(medamaoyaji);
-  medamaoyaji.x = 300;
-  medamaoyaji.y = 160;
-  medamaoyaji.scaleX = 0.1;
-  medamaoyaji.scaleY = 0.1;
-
-  stage.update();
 }
