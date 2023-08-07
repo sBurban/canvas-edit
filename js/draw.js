@@ -1,134 +1,97 @@
-var canvas, stage;
-var loader;
+var stage;
+var curve;
+var controlPoints = [];
 
-var mouseTarget; // the display object currently under the mouse, or being dragged
-var dragStarted; // indicates whether we are currently in a drag operation
-var offset;
-var update = true;
-
-// LOGIC HANDLERS
-
-// SETUP
+// Center and radius of the circular path
+const circleCenter = { x: 150, y: 150 };
+const circleRadius = 100;
 
 function init() {
-  // create stage and point it to the canvas:
-  canvas = document.getElementById("demoCanvas");
-  stage = new createjs.Stage(canvas);
-
-  loader = new createjs.LoadQueue(); // Create the LoadQueue instance once.
-  let testImage = new createjs.Bitmap(base64Image); //Image taken from another js file
-
-  stage.addChild(testImage);
-  testImage.x = 20;
-  testImage.y = 20;
-  testImage.scaleX = 0.9;
-  testImage.scaleY = 0.7;
-
-  stage.update();
-}
-
-function setIrisLeft() {
-  var container = new createjs.Container();
-  stage.addChild(container);
-
-  const circle1 = createCircle(container, 1);
-  const circle2 = createCircle(container, 2);
-  const circle3 = createCircle(container, 3);
-
-  var g = new createjs.Graphics();
-  // g.arc(100, 100, 20, 0, Math.PI * 2);
-  g.arcTo(circle1.x, circle1.y, circle2.x, circle2.y, 0);
-  // stage.addChild(g);
-
-  // enable touch interactions if supported on the current device:
-  createjs.Touch.enable(stage);
-
-  // enabled mouse over / out events
+  stage = new createjs.Stage("demoCanvas");
+  curve = new createjs.Shape();
   stage.enableMouseOver(10);
-  stage.mouseMoveOutside = true; // keep tracking the mouse even when it leaves the canvas
 
-  createjs.Ticker.addEventListener("tick", tick);
-}
+  const delimitingCircle = new createjs.Shape();
+  delimitingCircle.graphics
+    .setStrokeStyle(2)
+    .beginStroke("blue")
+    // .beginFill("DeepSkyBlue")
+    .drawCircle(circleCenter.x, circleCenter.y, circleRadius);
 
-// Actions carried out each tick (aka frame)
-function tick(event) {
-  // This set makes it so the stage only re-renders when an event handler indicates a change has happened.
-  if (update) {
-    update = false; // only update once
-    stage.update(event);
+  stage.addChild(delimitingCircle);
+
+  // Create the control points and add them to the stage
+  for (let i = 1; i < 4; i++) {
+    const point = new createjs.Shape();
+    point.graphics.beginFill("red").drawCircle(0, 0, 12);
+    // point.x = 50 + i * 100;
+    // point.y = 150;
+    point.cursor = "pointer";
+    // point.x = circleCenter.x + circleRadius * Math.cos((2 * Math.PI * i) / 3);
+    // point.y = circleCenter.y + circleRadius * Math.sin((2 * Math.PI * i) / 3);
+    // point.x = circleCenter.x + circleRadius * Math.cos(-1 * Math.PI * i);
+    // point.y = circleCenter.y + circleRadius * Math.sin((Math.PI / 2) * i);
+
+    let angleValue = 0;
+    if (i == 1) angleValue = Math.PI / 6;
+    else if (i == 3) angleValue = (Math.PI * 5) / 6;
+
+    if (i == 2) {
+      // Middle point
+      point.x = circleCenter.x + circleRadius * Math.cos(Math.PI / 2);
+      point.y = circleCenter.y + circleRadius * Math.sin((Math.PI * 5) / 6);
+      point.on("pressmove", function (evt) {
+        this.x = evt.stageX;
+        this.y = evt.stageY;
+        // console.log("coords: ", this.x, this.y);
+        updateCurve();
+      });
+    } else {
+      // Start and end points
+      point.x = circleCenter.x + circleRadius * Math.cos(angleValue);
+      point.y = circleCenter.y + circleRadius * Math.sin(angleValue);
+      point.on("pressmove", function (evt) {
+        // Calculate the angle and distance from the center to the current position
+        const dx = evt.stageX - circleCenter.x;
+        const dy = evt.stageY - circleCenter.y;
+        const angle = Math.atan2(dy, dx);
+        // const distance = Math.min(circleRadius, Math.sqrt(dx * dx + dy * dy));
+        const distance = circleRadius;
+        // Update the control point's position to stay within the circular path
+        this.x = circleCenter.x + distance * Math.cos(angle);
+        this.y = circleCenter.y + distance * Math.sin(angle);
+        updateCurve();
+      });
+    }
+
+    stage.addChild(point);
+    controlPoints.push(point);
   }
-}
 
-function stop() {
-  createjs.Ticker.removeEventListener("tick", tick);
-}
+  // Draw the initial curve
+  updateCurve();
 
-function createCircle(container, index) {
-  const newShape = new createjs.Shape();
-  container.addChild(newShape);
-  var myGraphics = newShape.graphics;
-  var fillCommand = myGraphics.beginFill("DeepSkyBlue").command;
-  myGraphics.drawCircle(0, 0, 10);
-
-  if (!index || index == 1) {
-    fillCommand.style = "DeepSkyBlue";
-    newShape.x = 50;
-    newShape.y = 50;
-  } else if (index == 2) {
-    fillCommand.style = "red";
-    newShape.x = 100;
-    newShape.y = 100;
-  } else if (index == 3) {
-    fillCommand.style = "green";
-    newShape.x = 150;
-    newShape.y = 150;
-  }
-  // newShape.regX = 50; // left offset
-  // newShape.regY = 50; // y offset
-  newShape.name = "circle_" + index;
-  newShape.cursor = "pointer";
-  const originalScale = newShape.scale;
-
-  // using "on" binds the listener to the scope of the currentTarget by default
-  // in this case that means it executes in the scope of the button.
-  newShape.on("mousedown", function (evt) {
-    const o = evt.target;
-    // Move the clicked shape to the top of its parent's display list (z-index).
-    o.parent.addChild(o);
-    // this.parent.addChild(o);
-
-    // Calculate the offset between the mouse cursor position and the newShape's position.
-    this.offset = { x: this.x - evt.stageX, y: this.y - evt.stageY };
-    // o.offset = { x: o.x - evt.stageX, y: o.y - evt.stageY };
-  });
-
-  // the pressmove event is dispatched when the mouse moves after a mousedown on the target until the mouse is released.
-  newShape.on("pressmove", function (evt) {
-    const o = evt.target;
-    o.x = evt.stageX + o.offset.x;
-    o.y = evt.stageY + o.offset.y;
-    // this.x = evt.stageX + this.offset.x;
-    // this.y = evt.stageY + this.offset.y;
-    // indicate that the stage should be updated on the next tick:
-    update = true;
-  });
-
-  // Increases size while mouse is over the Shape
-  newShape.on("rollover", function (evt) {
-    const o = evt.target;
-    o.scale = o.scale * 1.2;
-    // this.scale = this.scale * 1.2;
-    update = true;
-  });
-
-  // Returns size to normal when mouse is out of Shape
-  newShape.on("rollout", function (evt) {
-    const o = evt.target;
-    o.scale = originalScale;
-    update = true;
-  });
-
-  stage.addChild(newShape);
   stage.update();
-  return newShape;
 }
+
+function updateCurve() {
+  curve.graphics.clear();
+  curve.graphics.setStrokeStyle(2);
+  curve.graphics.beginStroke("black");
+
+  const startPoint = controlPoints[0];
+  const midPoint = controlPoints[1];
+  const endPoint = controlPoints[2];
+
+  // Calculate control points to ensure the curve passes through the center of the middle point
+  const controlX1 = 2 * midPoint.x - (startPoint.x + endPoint.x) / 2;
+  const controlY1 = 2 * midPoint.y - (startPoint.y + endPoint.y) / 2;
+
+  curve.graphics.moveTo(startPoint.x, startPoint.y);
+  curve.graphics.quadraticCurveTo(controlX1, controlY1, endPoint.x, endPoint.y);
+
+  stage.addChild(curve);
+  stage.update();
+}
+
+// init();
