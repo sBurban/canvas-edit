@@ -1,43 +1,81 @@
-var stage;
-var upperCurve;
-var lowerCurve;
-var delimitingCircle;
-var upperCurvePoints = [];
-var lowerCurvePoints = [];
+// import { draw } from "js/zoom.js"; // Or the extension could be just `.js`
 
-var leftIrisArea;
-var rightIrisArea;
+const drawScript = {
+  stage: null,
+  upperCurve: null,
+  lowerCurve: null,
+  upperCurvePoints: [],
+  lowerCurvePoints: [],
+  leftIrisArea: null,
+  leftIrisShape: null,
+  rightIrisArea: null,
+  rightIrisShape: null,
+  irisOptions: Object.freeze({
+    none: "none",
+    left: "left",
+    right: "right",
+  }),
+  // Center and radius of the circular path
 
-// Center and radius of the circular path
-const circleCenter = { x: 150, y: 150 };
-const circleRadius = 100;
+  loader: null,
+  testImage: null,
+  baseCircleData: {
+    circleCenter: { x: 150, y: 150 },
+    circleRadius: 100,
+  },
+};
+drawScript.currentDrawingStage = drawScript.irisOptions.none;
 
 function init() {
-  stage = new createjs.Stage("demoCanvas");
-  stage.enableMouseOver(10);
+  drawScript.stage = new createjs.Stage("demoCanvas");
+  drawScript.stage.enableMouseOver(10);
+  // draw();
+
+  drawScript.loader = new createjs.LoadQueue(); // Create the LoadQueue instance once.
+  drawScript.testImage = new createjs.Bitmap(base64Image); //Image taken from another js file
+  redrawImage();
+}
+
+function redrawImage() {
+  drawScript.stage.addChild(drawScript.testImage);
+  drawScript.testImage.x = 20;
+  drawScript.testImage.y = 20;
+  drawScript.testImage.scaleX = 0.9;
+  drawScript.testImage.scaleY = 0.7;
+
+  drawScript.stage.update();
 }
 
 function cancelDrawing() {
   resetCanvas();
+  drawScript.currentDrawingStage = drawScript.irisOptions.none;
 }
 
 function completeDrawing() {
-  leftIrisArea = upperCurvePoints
-    .concat(lowerCurvePoints.reverse())
-    .map((point) => ({ px: point.x, py: point.y }));
-  console.log(
-    "🚀 ~ file: draw.js:31 ~ completeDrawing ~ leftIrisArea:",
-    leftIrisArea
-  );
-
+  if (drawScript.currentDrawingStage === drawScript.irisOptions.left) {
+    drawScript.leftIrisArea = drawScript.upperCurvePoints
+      .concat(drawScript.lowerCurvePoints.reverse())
+      .map((point) => ({ px: point.x, py: point.y }));
+    drawScript.leftIrisShape = drawHexagon(drawScript.leftIrisArea);
+  } else if (drawScript.currentDrawingStage === drawScript.irisOptions.right) {
+    drawScript.rightIrisArea = drawScript.upperCurvePoints
+      .concat(drawScript.lowerCurvePoints.reverse())
+      .map((point) => ({ px: point.x, py: point.y }));
+    drawScript.rightIrisShape = drawHexagon(drawScript.rightIrisArea);
+  }
   resetCanvas();
-  drawHexagon(leftIrisArea);
+  if (drawScript.leftIrisArea)
+    drawScript.leftIrisShape = drawHexagon(drawScript.leftIrisArea);
+  if (drawScript.rightIrisArea)
+    drawScript.rightIrisShape = drawHexagon(drawScript.rightIrisArea);
+
+  drawScript.currentDrawingStage = drawScript.irisOptions.none;
 }
 
 function drawHexagon(irisArea) {
   const hexagon = new createjs.Shape();
 
-  hexagon.graphics.setStrokeStyle(2).beginStroke("purple").beginFill("red");
+  hexagon.graphics.setStrokeStyle(2).beginStroke("purple"); //.beginFill("red");
 
   irisArea.forEach((point, idx) => {
     const { px, py } = point;
@@ -47,59 +85,56 @@ function drawHexagon(irisArea) {
 
   // Close the area
   hexagon.graphics.lineTo(irisArea[0].px, irisArea[0].py);
-  stage.addChild(hexagon);
-  stage.update();
+  drawScript.stage.addChild(hexagon);
+  drawScript.stage.update();
+  return hexagon;
 }
 
 function resetCanvas() {
   setDrawingArea(false);
-  stage.removeAllChildren();
-  stage.update();
-  upperCurvePoints = [];
-  lowerCurvePoints = [];
+  drawScript.stage.removeAllChildren();
+  drawScript.stage.update();
+  drawScript.upperCurvePoints = [];
+  drawScript.lowerCurvePoints = [];
+  redrawImage();
 }
 
-function setDrawingArea(isDrawing) {
-  document.querySelector(".controls").innerHTML = "";
-  if (!isDrawing) {
-    const button1 = $(
-      `<button onClick="setIrisLeft();">Set Iris Left</button>`
-    ).appendTo(".controls");
-    const button2 = $(
-      `<button onClick="setIrisRight();">Set Iris Right</button>`
-    ).appendTo(".controls");
-    const button3 = $(`<button onClick="test(3)">3</button>`).appendTo(
-      ".controls"
-    );
-    const button4 = $(`<button onClick="test(4);">4</button>`).appendTo(
-      ".controls"
-    );
-  } else {
-    const button1 = $(
-      `<button onClick="completeDrawing();">Accept</button>`
-    ).appendTo(".controls");
-    const button2 = $(
-      `<button onClick="cancelDrawing();">Cancel</button>`
-    ).appendTo(".controls");
-  }
-}
-
-function setIrisLeft() {
+/**
+ * Starts drawing the Right Iris circle
+ */
+function setIrisRight() {
   resetCanvas();
+  drawScript.currentDrawingStage = drawScript.irisOptions.right;
   setIrisCircle();
 }
 
+/**
+ * Starts drawing the Left Iris circle
+ */
+function setIrisLeft() {
+  resetCanvas();
+  drawScript.currentDrawingStage = drawScript.irisOptions.left;
+  setIrisCircle();
+}
+
+/**
+ * Draws a circle and points that can be manipulated
+ */
 function setIrisCircle() {
-  upperCurve = new createjs.Shape();
-  lowerCurve = new createjs.Shape();
-  delimitingCircle = new createjs.Shape();
+  let { circleCenter, circleRadius } = drawScript.baseCircleData;
+  if (drawScript.currentDrawingStage === drawScript.irisOptions.right)
+    circleCenter = { x: 350, y: 150 };
+
+  drawScript.upperCurve = new createjs.Shape();
+  drawScript.lowerCurve = new createjs.Shape();
+  const delimitingCircle = new createjs.Shape();
   delimitingCircle.graphics
     .setStrokeStyle(2)
     .beginStroke("blue")
     // .beginFill("DeepSkyBlue")
     .drawCircle(circleCenter.x, circleCenter.y, circleRadius);
 
-  stage.addChild(delimitingCircle);
+  drawScript.stage.addChild(delimitingCircle);
   const colors = ["grey", "red", "green", "yellow"];
 
   // Create the control points and add them to the stage
@@ -173,10 +208,10 @@ function setIrisCircle() {
       });
     }
 
-    stage.addChild(upperPoint);
-    upperCurvePoints.push(upperPoint);
-    stage.addChild(lowerPoint);
-    lowerCurvePoints.push(lowerPoint);
+    drawScript.stage.addChild(upperPoint);
+    drawScript.upperCurvePoints.push(upperPoint);
+    drawScript.stage.addChild(lowerPoint);
+    drawScript.lowerCurvePoints.push(lowerPoint);
 
     setDrawingArea(true);
   }
@@ -184,62 +219,69 @@ function setIrisCircle() {
   // Draw the initial curves
   updateCurve();
 
-  stage.update();
+  drawScript.stage.update();
 }
 
+/**
+ * Calls both update curve functions
+ */
 function updateCurve() {
   upperCurveUpdate();
   lowerCurveUpdate();
 }
 
+/**
+ * Updates the points that belong to the 'upperCurve' of the circle
+ */
 function upperCurveUpdate() {
-  upperCurve.graphics.clear();
-  upperCurve.graphics.setStrokeStyle(2);
-  upperCurve.graphics.beginStroke("black");
+  drawScript.upperCurve.graphics.clear();
+  drawScript.upperCurve.graphics.setStrokeStyle(2);
+  drawScript.upperCurve.graphics.beginStroke("black");
 
-  const startPoint = upperCurvePoints[0];
-  const midPoint = upperCurvePoints[1];
-  const endPoint = upperCurvePoints[2];
+  const startPoint = drawScript.upperCurvePoints[0];
+  const midPoint = drawScript.upperCurvePoints[1];
+  const endPoint = drawScript.upperCurvePoints[2];
 
   // Calculate control points to ensure the curve passes through the center of the middle point
   const controlX1 = 2 * midPoint.x - (startPoint.x + endPoint.x) / 2;
   const controlY1 = 2 * midPoint.y - (startPoint.y + endPoint.y) / 2;
 
-  upperCurve.graphics.moveTo(startPoint.x, startPoint.y);
-  upperCurve.graphics.quadraticCurveTo(
+  drawScript.upperCurve.graphics.moveTo(startPoint.x, startPoint.y);
+  drawScript.upperCurve.graphics.quadraticCurveTo(
     controlX1,
     controlY1,
     endPoint.x,
     endPoint.y
   );
 
-  stage.addChild(upperCurve);
-  stage.update();
+  drawScript.stage.addChild(drawScript.upperCurve);
+  drawScript.stage.update();
 }
 
+/**
+ * Updates the points that belong to the 'lowerCurve of the circle
+ */
 function lowerCurveUpdate() {
-  lowerCurve.graphics.clear();
-  lowerCurve.graphics.setStrokeStyle(2);
-  lowerCurve.graphics.beginStroke("black");
+  drawScript.lowerCurve.graphics.clear();
+  drawScript.lowerCurve.graphics.setStrokeStyle(2);
+  drawScript.lowerCurve.graphics.beginStroke("black");
 
-  const startPoint = lowerCurvePoints[0];
-  const midPoint = lowerCurvePoints[1];
-  const endPoint = lowerCurvePoints[2];
+  const startPoint = drawScript.lowerCurvePoints[0];
+  const midPoint = drawScript.lowerCurvePoints[1];
+  const endPoint = drawScript.lowerCurvePoints[2];
 
   // Calculate control points to ensure the curve passes through the center of the middle point
   const controlX1 = 2 * midPoint.x - (startPoint.x + endPoint.x) / 2;
   const controlY1 = 2 * midPoint.y - (startPoint.y + endPoint.y) / 2;
 
-  lowerCurve.graphics.moveTo(startPoint.x, startPoint.y);
-  lowerCurve.graphics.quadraticCurveTo(
+  drawScript.lowerCurve.graphics.moveTo(startPoint.x, startPoint.y);
+  drawScript.lowerCurve.graphics.quadraticCurveTo(
     controlX1,
     controlY1,
     endPoint.x,
     endPoint.y
   );
 
-  stage.addChild(lowerCurve);
-  stage.update();
+  drawScript.stage.addChild(drawScript.lowerCurve);
+  drawScript.stage.update();
 }
-
-// init();
