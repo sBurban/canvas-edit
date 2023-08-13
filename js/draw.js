@@ -18,32 +18,40 @@ const drawScript = {
   // Center and radius of the circular path
 
   loader: null,
+  imageOrigin: null,
   testImage: null,
+  imageScaler: null,
   baseCircleData: {
     circleCenter: { x: 150, y: 150 },
     circleRadius: 100,
   },
+  activeIrisCircle: null,
 };
+
 drawScript.currentDrawingStage = drawScript.irisOptions.none;
+// const testImageSrc = "https://s3.envato.com/files/289097391/jju-32.jpg";
+const testImageSrc = base64Image;
 
 function init() {
   drawScript.stage = new createjs.Stage("demoCanvas");
   drawScript.stage.enableMouseOver(10);
   // draw();
 
-  drawScript.loader = new createjs.LoadQueue(); // Create the LoadQueue instance once.
-  drawScript.testImage = new createjs.Bitmap(base64Image); //Image taken from another js file
-  redrawImage();
+  // var img = new Image();
+  // img.crossOrigin = "Anonymous"; // Loaded cross-domain
+  // img.src = "https://s3.envato.com/files/289097391/jju-32.jpg";
+  // drawScript.testImage = new createjs.Bitmap(img);
+  // drawScript.loader = new createjs.LoadQueue(); // Create the LoadQueue instance once.
+  // drawScript.testImage = new createjs.Bitmap(base64Image); //Image taken from another js file
+  redrawImage(testImageSrc);
+  setDrawingControls(false);
 }
 
-function redrawImage() {
-  drawScript.stage.addChild(drawScript.testImage);
-  drawScript.testImage.x = 20;
-  drawScript.testImage.y = 20;
-  drawScript.testImage.scaleX = 0.9;
-  drawScript.testImage.scaleY = 0.7;
-
-  drawScript.stage.update();
+function redrawImage(url) {
+  if (drawScript.testImage) {
+    drawScript.stage.addChild(drawScript.testImage);
+    drawScript.stage.update();
+  } else loadImageAndResize(url);
 }
 
 function cancelDrawing() {
@@ -51,7 +59,7 @@ function cancelDrawing() {
   drawScript.currentDrawingStage = drawScript.irisOptions.none;
 }
 
-function completeDrawing() {
+async function completeDrawing() {
   if (drawScript.currentDrawingStage === drawScript.irisOptions.left) {
     drawScript.leftIrisArea = drawScript.upperCurvePoints
       .concat(drawScript.lowerCurvePoints.reverse())
@@ -90,19 +98,20 @@ function drawHexagon(irisArea) {
   return hexagon;
 }
 
-function resetCanvas() {
-  setDrawingArea(false);
+async function resetCanvas() {
+  setDrawingControls(false);
   drawScript.stage.removeAllChildren();
-  drawScript.stage.update();
+  // drawScript.stage.update();
   drawScript.upperCurvePoints = [];
   drawScript.lowerCurvePoints = [];
-  redrawImage();
+  drawScript.activeIrisCircle = null;
+  redrawImage(testImageSrc);
 }
 
 /**
  * Starts drawing the Right Iris circle
  */
-function setIrisRight() {
+async function setIrisRight() {
   resetCanvas();
   drawScript.currentDrawingStage = drawScript.irisOptions.right;
   setIrisCircle();
@@ -111,7 +120,7 @@ function setIrisRight() {
 /**
  * Starts drawing the Left Iris circle
  */
-function setIrisLeft() {
+async function setIrisLeft() {
   resetCanvas();
   drawScript.currentDrawingStage = drawScript.irisOptions.left;
   setIrisCircle();
@@ -133,6 +142,8 @@ function setIrisCircle() {
     .beginStroke("blue")
     // .beginFill("DeepSkyBlue")
     .drawCircle(circleCenter.x, circleCenter.y, circleRadius);
+
+  drawScript.activeIrisCircle = delimitingCircle;
 
   drawScript.stage.addChild(delimitingCircle);
   const colors = ["grey", "red", "green", "yellow"];
@@ -213,7 +224,7 @@ function setIrisCircle() {
     drawScript.stage.addChild(lowerPoint);
     drawScript.lowerCurvePoints.push(lowerPoint);
 
-    setDrawingArea(true);
+    setDrawingControls(true);
   }
 
   // Draw the initial curves
